@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Minimal coverage for new code
+  NEW_CODE_COVERAGE_MIN: 80
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build
+        working-directory: backend
+        run: ./gradlew build
+
+      - name: Coverage of new code
+        if: github.event_name == 'pull_request'
+        run: |
+          pipx run diff-cover==11.0.4 backend/build/reports/jacoco/test/jacocoTestReport.xml \
+            --src-roots backend/src/main/java \
+            --compare-branch=origin/${{ github.base_ref }} \
+            --fail-under=$NEW_CODE_COVERAGE_MIN \
+            --format markdown:diff-cover.md || status=$?
+          cat diff-cover.md >> "$GITHUB_STEP_SUMMARY"
+          exit ${status:-0}
+
+      - name: Upload test & coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-reports
+          path: |
+            backend/build/reports/tests/
+            backend/build/reports/jacoco/
+          if-no-files-found: ignore
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-jar
+          path: backend/build/libs/*.jar
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Coverage of new code
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        run: |
+          pipx run diff-cover==11.0.4 frontend/coverage/cobertura-coverage.xml \
+            --compare-branch=origin/${{ github.base_ref }} \
+            --fail-under=$NEW_CODE_COVERAGE_MIN \
+            --format markdown:diff-cover.md || status=$?
+          cat diff-cover.md >> "$GITHUB_STEP_SUMMARY"
+          exit ${status:-0}
+
+      - name: Upload test & coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-reports
+          path: |
+            frontend/coverage/
+            frontend/test-results/
+          if-no-files-found: ignore
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: frontend/dist/
