@@ -42,7 +42,7 @@ tasks.jacocoTestReport {
 		xml.required = true
 		html.required = true
 	}
-	// Main class does not affect coverage
+	// The *Application class just starts Spring, so leave it out of coverage
 	classDirectories.setFrom(
 		files(classDirectories.files.map {
 			fileTree(it) { exclude("**/*Application.class") }
