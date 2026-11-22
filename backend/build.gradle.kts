@@ -18,6 +18,11 @@ repositories {
 	mavenCentral()
 }
 
+// After changing dependencies run: ./gradlew dependencies --write-locks
+dependencyLocking {
+	lockAllConfigurations()
+}
+
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
