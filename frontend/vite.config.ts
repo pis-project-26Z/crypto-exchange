@@ -12,9 +12,10 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      // Exclude main class from coverage
+      // main.tsx only mounts <App />, nothing worth testing there
       exclude: ['src/main.tsx', 'src/**/*.test.{ts,tsx}'],
-      reporter: ['text', 'html', 'cobertura'],
+      // Sonar reads lcov; paths are relative to the repo root so it can match frontend/src/...
+      reporter: ['text', 'html', 'cobertura', ['lcov', { projectRoot: '..' }]],
     },
   },
 })

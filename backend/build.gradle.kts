@@ -18,6 +18,11 @@ repositories {
 	mavenCentral()
 }
 
+// After changing dependencies run: ./gradlew dependencies --write-locks
+dependencyLocking {
+	lockAllConfigurations()
+}
+
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -42,7 +47,7 @@ tasks.jacocoTestReport {
 		xml.required = true
 		html.required = true
 	}
-	// Main class does not affect coverage
+	// The *Application class just starts Spring, so leave it out of coverage
 	classDirectories.setFrom(
 		files(classDirectories.files.map {
 			fileTree(it) { exclude("**/*Application.class") }

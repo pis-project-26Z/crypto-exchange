@@ -12,10 +12,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # Minimal coverage for new code
-  NEW_CODE_COVERAGE_MIN: 80
-
 jobs:
   backend:
     name: Backend
@@ -23,30 +19,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 25
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       - name: Build
         working-directory: backend
         run: ./gradlew build
-
-      - name: Coverage of new code
-        if: github.event_name == 'pull_request'
-        run: |
-          pipx run diff-cover==11.0.4 backend/build/reports/jacoco/test/jacocoTestReport.xml \
-            --src-roots backend/src/main/java \
-            --compare-branch=origin/${{ github.base_ref }} \
-            --fail-under=$NEW_CODE_COVERAGE_MIN \
-            --format markdown:diff-cover.md || status=$?
-          cat diff-cover.md >> "$GITHUB_STEP_SUMMARY"
-          exit ${status:-0}
 
       - name: Upload test & coverage reports
         if: always()
@@ -57,6 +40,15 @@ jobs:
             backend/build/reports/tests/
             backend/build/reports/jacoco/
           if-no-files-found: ignore
+
+      - name: Upload Sonar inputs
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-sonar
+          path: |
+            backend/build/classes/java/main/
+            backend/build/reports/jacoco/test/jacocoTestReport.xml
+          retention-days: 1
 
       - name: Upload jar
         uses: actions/upload-artifact@v7
@@ -73,8 +65,6 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -83,7 +73,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint
         run: npm run lint
@@ -93,17 +83,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Coverage of new code
-        if: github.event_name == 'pull_request'
-        working-directory: .
-        run: |
-          pipx run diff-cover==11.0.4 frontend/coverage/cobertura-coverage.xml \
-            --compare-branch=origin/${{ github.base_ref }} \
-            --fail-under=$NEW_CODE_COVERAGE_MIN \
-            --format markdown:diff-cover.md || status=$?
-          cat diff-cover.md >> "$GITHUB_STEP_SUMMARY"
-          exit ${status:-0}
 
       - name: Upload test & coverage reports
         if: always()
@@ -115,8 +94,42 @@ jobs:
             frontend/test-results/
           if-no-files-found: ignore
 
+      - name: Upload Sonar inputs
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-sonar
+          path: frontend/coverage/lcov.info
+          retention-days: 1
+
       - name: Upload dist
         uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist/
+
+  sonar:
+    name: Sonar
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download backend Sonar inputs
+        uses: actions/download-artifact@v8
+        with:
+          name: backend-sonar
+          path: backend/build
+
+      - name: Download frontend Sonar inputs
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-sonar
+          path: frontend/coverage
+
+      - name: SonarQube Cloud scan
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
