@@ -62,6 +62,10 @@ pnpm-debug.log*
 !.yarn/sdks
 !.yarn/versions
 
+# ===== Jenkins workspace caches =====
+.gradle-home/
+.npm-cache/
+
 # ===== Env / secrets =====
 .env
 .env.*
