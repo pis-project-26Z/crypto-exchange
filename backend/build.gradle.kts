@@ -1,4 +1,5 @@
 plugins {
+	`maven-publish`
 	java
 	jacoco
 	id("org.springframework.boot") version "4.2.0"
@@ -53,4 +54,28 @@ tasks.jacocoTestReport {
 			fileTree(it) { exclude("**/*Application.class") }
 		})
 	)
+}
+
+publishing {
+	publications {
+		create<MavenPublication>("mavenJava") {
+			artifact(tasks.named("bootJar"))
+		}
+	}
+	repositories {
+		maven {
+			val nexusBaseUrl = System.getenv("NEXUS_URL") ?: "http://localhost:8081"
+			val repo = if (version.toString().endsWith("SNAPSHOT")) {
+				"maven-snapshots"
+			} else {
+				"maven-releases"
+			}
+			url = uri("$nexusBaseUrl/repository/$repo/")
+			isAllowInsecureProtocol = true
+			credentials {
+				username = System.getenv("NEXUS_USER") ?: ""
+				password = System.getenv("NEXUS_PASS") ?: ""
+			}
+		}
+	}
 }
