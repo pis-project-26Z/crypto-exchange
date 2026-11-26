@@ -106,5 +106,30 @@ pipeline {
                 }
             }
         }
+        stage('Publish to Nexus') {
+                 when {
+                     branch 'main'
+                 }
+                 options {
+                     timeout(time: 15, unit: 'MINUTES')
+                 }
+                 agent {
+                     docker {
+                         image 'eclipse-temurin:25-jdk'
+                         args '--network devops-net'
+                     }
+                 }
+                 environment {
+                     GRADLE_USER_HOME = "${WORKSPACE}/.gradle-home"
+                     NEXUS_URL = 'http://nexus:8081'
+                 }
+                 steps {
+                     withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                         dir('backend') {
+                             sh './gradlew publish --no-daemon'
+                         }
+                     }
+                 }
+             }
     }
 }
